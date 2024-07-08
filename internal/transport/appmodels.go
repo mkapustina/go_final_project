@@ -18,7 +18,7 @@ type Application struct {
 	Config   *config.Config
 }
 
-func AppInit(log *config.Logger, cfg *config.Config) (*Application, *http.Server) {
+func InitApp(log *config.Logger, cfg *config.Config) (*Application, *http.Server) {
 	addr := flag.String("addr", ":"+cfg.Port, "Сетевой адрес веб-сервера")
 	flag.Parse()
 

@@ -83,7 +83,7 @@ func (s *TaskStore) GetAll(search string) (models.Tasks, error) {
 		if errDt == nil {
 			search = searchDT.Format("20060102")
 
-			sqlText += " WHERE date LIKE :text "
+			sqlText += " WHERE date = :text "
 		} else {
 			search = "%" + strings.ToLower(search) + "%"
 			sqlText += " WHERE LOWER(title) LIKE :text OR LOWER(comment) LIKE :text"

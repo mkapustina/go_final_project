@@ -16,7 +16,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	app, srv := transport.AppInit(&logger, &cfg)
+	app, srv := transport.InitApp(&logger, &cfg)
 	defer app.Tasks.Db.Close()
 
 	app.InfoLog.Printf("Запуск сервера на %s", srv.Addr)

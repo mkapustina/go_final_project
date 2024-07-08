@@ -20,7 +20,7 @@
 Для запуска полного списка тестов, включающего все задачи со звездочкой, в файле ./tests/settings.go должны быть указаны следующие параметры:
 ```go
 var Port = 7540
-var DBFile = "../scheduler.db"
+var DBFile = "../db/scheduler.db"
 var FullNextDate = true
 var Search = true
 var Token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwd2QiOiI1OTk0NDcxYWJiMDExMTJhZmNjMTgxNTlmNmNjNzRiNGY1MTFiOTk4MDZkYTU5YjNjYWY1YTljMTczY2FjZmM1In0.G2IyLSf_6d0BTMd55WSovmTagaSS9v5DHBmcAr2Hcf0"
