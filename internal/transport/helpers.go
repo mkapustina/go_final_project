@@ -1,4 +1,4 @@
-package main
+package transport
 
 import (
 	"bytes"
@@ -8,21 +8,39 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
+	"runtime/debug"
 	"slices"
 	"strconv"
 	"strings"
-	"text/template"
 	"time"
+
+	"github.com/mkapustina/go_final_project/internal/models"
 
 	"github.com/golang-jwt/jwt/v5"
 )
 
+// Помощник serverError записывает сообщение об ошибке в errorLog и
+// затем отправляет пользователю ответ 500 "Внутренняя ошибка сервера".
+func (app *Application) ServerError(w http.ResponseWriter, err error) {
+	trace := fmt.Sprintf(`{"error":"%s\n%s"}`, err.Error(), debug.Stack())
+	app.ErrorLog.Output(2, trace)
+
+	http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusInternalServerError)
+}
+
+// Помощник clientError отправляет определенный код состояния и
+// соответствующее описание пользователю.
+func (app *Application) ClientError(w http.ResponseWriter, status int, statusText string) {
+	http.Error(w, fmt.Sprintf(`{"error":"%s"}`, statusText), status)
+}
+
+// Получение текущей даты без времени.
 func getNowDate() time.Time {
 	nowDate, _ := time.Parse("20060102", time.Now().Format("20060102"))
 	return nowDate
 }
 
+// Проверка на соответствие формату полученной строики правила повтора.
 func checkRepeat(repeat string) (string, []int, []int, error) {
 	var num int
 	var err error
@@ -99,6 +117,8 @@ func checkRepeat(repeat string) (string, []int, []int, error) {
 	return pref, suf1, suf2, nil
 }
 
+// Определение следующей даты повтора в соотвествии с полученными на вход
+// текущей датой, датой задачи и правилами повтора
 func NextDate(now time.Time, date string, repeat string) (string, error) {
 	var retDate, tmpDate time.Time
 	var num int
@@ -191,24 +211,7 @@ func NextDate(now time.Time, date string, repeat string) (string, error) {
 	}
 }
 
-func (app *application) getNextDate(w http.ResponseWriter, r *http.Request) {
-	now, err := time.Parse("20060102", r.FormValue("now"))
-	if err != nil {
-		app.serverError(w, err)
-		return
-	}
-
-	resp, err := NextDate(now, r.FormValue("date"), r.FormValue("repeat"))
-
-	if err != nil {
-		app.serverError(w, err)
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(resp))
-}
-
+// Проверка полученно даты задания на соотвествие формату
 func checkDate(taskDate string, taskRepeat string) (string, error) {
 	resDate := taskDate
 	nowDate := getNowDate()
@@ -231,8 +234,9 @@ func checkDate(taskDate string, taskRepeat string) (string, error) {
 	return resDate, nil
 }
 
-func checkTask(r *http.Request) (Task, error) {
-	var task Task
+// Проверка полученного задания на соответствие формату
+func CheckTask(r *http.Request) (models.Task, error) {
+	var task models.Task
 	var buf bytes.Buffer
 	var err error
 
@@ -261,179 +265,7 @@ func checkTask(r *http.Request) (Task, error) {
 	return task, nil
 }
 
-func (app *application) addTask(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
-	task, err := checkTask(r)
-	if err != nil {
-		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusBadRequest)
-		return
-	}
-
-	id, err := app.tasks.Add(task)
-	if err != nil {
-		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusBadRequest)
-		return
-	}
-
-	task.ID = fmt.Sprint(id)
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(fmt.Sprintf(`{"id":"%d"}`, id)))
-}
-
-func (app *application) updateTask(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
-	task, err := checkTask(r)
-	if err != nil {
-		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusBadRequest)
-		return
-	}
-
-	cnt, err := app.tasks.Update(task)
-	if err != nil {
-		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusBadRequest)
-		return
-	}
-	if cnt == 0 {
-		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, "Задача не найдена"), http.StatusNotFound)
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`{}`))
-}
-
-func (app *application) getTask(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	id := r.URL.Query().Get("id")
-	if len(id) == 0 {
-		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, "Не задан номер задачи"), http.StatusBadRequest)
-		return
-	}
-
-	numId, err := strconv.Atoi(id)
-	if err != nil || numId < 1 {
-		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, "Некорректный номер задачи"), http.StatusBadRequest)
-		return
-	}
-
-	task, err := app.tasks.Get(numId)
-	if err != nil {
-		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusNotFound)
-		return
-	}
-
-	resp, err := json.Marshal(task)
-	if err != nil {
-		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusInternalServerError)
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
-	w.Write(resp)
-}
-
-func (app *application) getTasks(w http.ResponseWriter, r *http.Request) {
-	var tasks Tasks
-	var err error
-
-	w.Header().Set("Content-Type", "application/json")
-
-	search := r.URL.Query().Get("search")
-	if len(search) != 0 {
-		searchDT, err := time.Parse("02.01.2006", search)
-		if err == nil {
-			search = searchDT.Format("20060102")
-		}
-		search = "%" + strings.ToUpper(search) + "%"
-	}
-
-	tasks, err = app.tasks.GetAll(search)
-	if err != nil {
-		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusInternalServerError)
-		return
-	}
-
-	resp, err := json.Marshal(tasks)
-	if err != nil {
-		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusInternalServerError)
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
-	w.Write(resp)
-}
-
-func (app *application) deleteTask(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
-	id := r.URL.Query().Get("id")
-	if len(id) == 0 {
-		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, "Не задан номер задачи"), http.StatusBadRequest)
-		return
-	}
-
-	numId, err := strconv.Atoi(id)
-	if err != nil || numId < 1 {
-		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, "Некорректный номер задачи"), http.StatusBadRequest)
-		return
-	}
-
-	err = app.tasks.Delete(numId)
-	if err != nil {
-		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusNotFound)
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`{}`))
-}
-
-func (app *application) setDoneTask(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
-	id := r.URL.Query().Get("id")
-	if len(id) == 0 {
-		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, "Не задан номер задачи"), http.StatusBadRequest)
-		return
-	}
-
-	numId, err := strconv.Atoi(id)
-	if err != nil || numId < 1 {
-		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, "Некорректный номер задачи"), http.StatusBadRequest)
-		return
-	}
-
-	task, err := app.tasks.Get(numId)
-	if err != nil {
-		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusNotFound)
-		return
-	}
-
-	if len(task.Repeat) == 0 {
-		err = app.tasks.Delete(numId)
-		if err != nil {
-			http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusInternalServerError)
-			return
-		}
-	} else {
-		task.Date, err = NextDate(getNowDate(), task.Date, task.Repeat)
-		if err != nil {
-			http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusInternalServerError)
-			return
-		}
-		cnt, err := app.tasks.Update(task)
-		if err != nil || cnt == 0 {
-			http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusInternalServerError)
-			return
-		}
-	}
-
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`{}`))
-}
-
+// получение нового токена
 func getToken(password string) (string, error) {
 	secret := []byte("my_secret_key")
 
@@ -448,10 +280,9 @@ func getToken(password string) (string, error) {
 	return signedToken, err
 }
 
-func checkCookie(r *http.Request) error {
-	pwdStored := os.Getenv("TODO_PASSWORD")
-
-	if len(pwdStored) == 0 {
+// Проверка пполученной куки на соотвествие токену
+func (app *Application) checkCookie(r *http.Request) error {
+	if len(app.Config.Password) == 0 {
 		return nil
 	}
 
@@ -476,62 +307,18 @@ func checkCookie(r *http.Request) error {
 		return errors.New("токен не валиден")
 	}
 
-	token, _ := getToken(pwdStored)
+	token, _ := getToken(app.Config.Password)
 	if cookieToken != token {
 		return errors.New("токен не валиден")
 	}
 	return nil
 }
 
-func (app *application) login(w http.ResponseWriter, r *http.Request) {
-	url := "./web/login.html"
-	err := checkCookie(r)
-	if err == nil {
-		url = "./web/index.html"
-	}
-	t, _ := template.ParseFiles(url)
-	t.Execute(w, "")
-}
-
-func (app *application) signIn(w http.ResponseWriter, r *http.Request) {
-	var user User
-	var buf bytes.Buffer
-
-	w.Header().Set("Content-Type", "application/json")
-
-	_, err := buf.ReadFrom(r.Body)
-	if err != nil {
-		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusInternalServerError)
-		return
-	}
-
-	err = json.Unmarshal(buf.Bytes(), &user)
-	if err != nil {
-		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusInternalServerError)
-		return
-	}
-
-	pwd := os.Getenv("TODO_PASSWORD")
-
-	if len(pwd) > 0 && pwd != user.Password {
-		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, "неверный пароль"), http.StatusUnauthorized)
-		return
-	}
-
-	signedToken, err := getToken(pwd)
-	if err != nil {
-		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, "failed to sign jwt: "+err.Error()), http.StatusUnauthorized)
-	}
-
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(fmt.Sprintf(`{"token":"%s"}`, signedToken)))
-}
-
-func auth(next http.HandlerFunc) http.HandlerFunc {
+func (app *Application) auth(next http.HandlerFunc) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		err := checkCookie(r)
+		err := app.checkCookie(r)
 		if err != nil {
-			http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusUnauthorized)
+			app.ClientError(w, http.StatusUnauthorized, err.Error())
 		}
 		next(w, r)
 	})

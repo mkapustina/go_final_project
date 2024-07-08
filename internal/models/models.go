@@ -1,4 +1,4 @@
-package main
+package models
 
 //var ErrNoRecord = errors.New("models: подходящей записи не найдено")
 
