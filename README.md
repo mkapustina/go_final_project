@@ -13,7 +13,7 @@
 
 # Тестирование задач
 
-Для запуска кода локально в VSCode можно использовать приложенный в исходниках launch.json. 
+Для запуска кода локально в VSCode можно использовать приложенный в исходниках launch.json.
 
 Следует учесть, что при заданной переменной окружения TODO_PASSWORD тест TestApp из файла app_1_test.go будет падать с ошибкой, т.к. он не учитывает, что index.html не будет показан при его запросе до тех пор пока не пройдет авторизация пользователя.
 
@@ -40,9 +40,10 @@ var Token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwd2QiOiI1OTk0NDcxYWJiMDExMT
 ## Запуск проекта
 
 Пример запуска с подключеннием базы данных (при условии сборки по умолчанию)
-`docker run -d -p 7540:7540 -v ./scheduler.db:/app/db/scheduler.db go_final_project:latest`
+`docker run -d -p 7540:7540 -v ./db/scheduler.db:/app/db/scheduler.db go_final_project:latest`
 
 Также можно задать все необходимые переменные окружения
 - TODO_PORT
 - TODO_DBFILE (требует корректировки запуска в части монтирования)
 - TODO_PASSWORD
+- TODO_WEBDIR
