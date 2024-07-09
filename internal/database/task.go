@@ -4,13 +4,12 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/mkapustina/go_final_project/internal/models"
 )
 
-const selectSQL = "SELECT id, date, title, comment, repeat FROM scheduler"
+const rowsLimit = 10
 
 type TaskStore struct {
 	Db *sql.DB
@@ -54,7 +53,7 @@ func (s *TaskStore) Update(t models.Task) (int, error) {
 }
 
 func (s *TaskStore) Get(id int) (models.Task, error) {
-	row := s.Db.QueryRow(selectSQL+" WHERE id = :id",
+	row := s.Db.QueryRow("SELECT id, date, title, comment, repeat FROM scheduler WHERE id = :id",
 		sql.Named("id", id))
 
 	task := models.Task{}
@@ -68,33 +67,26 @@ func (s *TaskStore) Get(id int) (models.Task, error) {
 }
 
 func (s *TaskStore) GetAll(search string) (models.Tasks, error) {
-	const rowsLimit = 10
-	const limitSql = " ORDER BY date LIMIT :limit"
 	var err error
 	var rows *sql.Rows
 	var sqlText string
 
 	res := models.Tasks{}
 	res.Tasks = make([]models.Task, 0)
-	sqlText = selectSQL
-
 	if len(search) > 0 {
 		searchDT, errDt := time.Parse("02.01.2006", search)
 		if errDt == nil {
 			search = searchDT.Format("20060102")
-
-			sqlText += " WHERE date = :text "
+			sqlText += "SELECT id, date, title, comment, repeat FROM scheduler WHERE date = :text ORDER BY date LIMIT :limit"
 		} else {
-			search = "%" + strings.ToLower(search) + "%"
-			sqlText += " WHERE LOWER(title) LIKE :text OR LOWER(comment) LIKE :text"
-
+			search = "%" + search + "%"
+			sqlText += "SELECT id, date, title, comment, repeat FROM scheduler WHERE title LIKE :text OR comment LIKE :text  ORDER BY date LIMIT :limit"
 		}
-		sqlText += limitSql
 		rows, err = s.Db.Query(sqlText,
 			sql.Named("text", search),
 			sql.Named("limit", rowsLimit))
 	} else {
-		sqlText += limitSql
+		sqlText = "SELECT id, date, title, comment, repeat FROM scheduler  ORDER BY date LIMIT :limit"
 		rows, err = s.Db.Query(sqlText,
 			sql.Named("limit", rowsLimit))
 	}

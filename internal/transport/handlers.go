@@ -28,7 +28,7 @@ func (app *Application) getNextDate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(resp))
+	_, _ = w.Write([]byte(resp))
 }
 
 func (app *Application) addTask(w http.ResponseWriter, r *http.Request) {
@@ -48,7 +48,7 @@ func (app *Application) addTask(w http.ResponseWriter, r *http.Request) {
 
 	task.ID = fmt.Sprint(id)
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(fmt.Sprintf(`{"id":"%d"}`, id)))
+	_, _ = w.Write([]byte(fmt.Sprintf(`{"id":"%d"}`, id)))
 }
 
 func (app *Application) updateTask(w http.ResponseWriter, r *http.Request) {
@@ -71,7 +71,7 @@ func (app *Application) updateTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`{}`))
+	_, _ = w.Write([]byte(`{}`))
 }
 
 func (app *Application) getTask(w http.ResponseWriter, r *http.Request) {
@@ -101,7 +101,7 @@ func (app *Application) getTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
-	w.Write(resp)
+	_, _ = w.Write(resp)
 }
 
 func (app *Application) getTasks(w http.ResponseWriter, r *http.Request) {
@@ -120,7 +120,7 @@ func (app *Application) getTasks(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
-	w.Write(resp)
+	_, _ = w.Write(resp)
 }
 
 func (app *Application) deleteTask(w http.ResponseWriter, r *http.Request) {
@@ -145,7 +145,7 @@ func (app *Application) deleteTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`{}`))
+	_, _ = w.Write([]byte(`{}`))
 }
 
 func (app *Application) setDoneTask(w http.ResponseWriter, r *http.Request) {
@@ -189,7 +189,7 @@ func (app *Application) setDoneTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`{}`))
+	_, _ = w.Write([]byte(`{}`))
 }
 
 func (app *Application) login(w http.ResponseWriter, r *http.Request) {
@@ -231,5 +231,5 @@ func (app *Application) signIn(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(fmt.Sprintf(`{"token":"%s"}`, signedToken)))
+	_, _ = w.Write([]byte(fmt.Sprintf(`{"token":"%s"}`, signedToken)))
 }
